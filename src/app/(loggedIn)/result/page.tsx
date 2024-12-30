@@ -1,18 +1,24 @@
+"use client";
+
 import ResultPage from "../../../components/dashbord/ResultPage";
-import FormPage from "../../../components/findPlan/findform";
+import FormPage from "../../../components/findPlan/findForm";
+import { useState } from "react";
+
 
 export default function ResPage() {
-  return (
-    <div className="flex-1 flex">
-    {/* Left: Results */}
-    <div className="flex-1 bg-white">
-    <ResultPage />
-    </div>
+  const [results, setResults] = useState<any[]>([]); // State to store results
 
-    {/* Right: Search Form */}
-    <div className="w-1/3 bg-gray-50 p-6">
-      <FormPage />
+  return (
+    <div className="flex-1 flex overflow-hidden">
+      {/* Left: Results */}
+      <div className="flex-1 bg-white overflow-y-auto">
+        <ResultPage results={results} />
+      </div>
+
+      {/* Right: Search Form */}
+      <div className="w-1/3 bg-gray-50 p-6 overflow-y-auto mt-11">
+        <FormPage setResults={setResults} />
+      </div>
     </div>
-  </div>
   );
 }

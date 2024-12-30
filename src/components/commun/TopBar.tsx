@@ -3,7 +3,7 @@
 import { Bell, UserCircle, Menu } from 'lucide-react'; // Added Menu icon
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import Sidebar from './Sidebar'; // Import Sidebar
+import Sidebar from '../commun/Sidebar'; // Import Sidebar
 
 export default function TopBar() {
   return (

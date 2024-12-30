@@ -21,7 +21,6 @@ export default function Sidebar() {
           <Bookmark size={20} /> <span>Bookmarked by me</span>
         </li>
       </ul>
-      
     </nav>
   </div>
   

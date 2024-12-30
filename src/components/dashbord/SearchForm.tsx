@@ -1,91 +1,230 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { SearchWithProject } from '../../api/search/search-api';
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getProjects } from "../../api/project/project";
+import dynamic from 'next/dynamic';
+import { projectPlanData } from "../data/planart";
+import { projectPlainhaltData } from "../data/planinhalt"; 
+import { projectMassstabData } from "../data/maßstab"; 
+import { projectPhaseData } from "../data/phase";
+import { GetMetaData } from "../../api/metaData/metadata";
 
-const SearchForm = () => {
-  const [projectName, setProjectName] = useState('');
-  const [planType, setPlanType] = useState('');
-  const [planContent, setPlanContent] = useState('');
-  const [workPhase, setWorkPhase] = useState('');
-  const [scale, setScale] = useState('');
-  const [openSearch, setOpenSearch] = useState('');
+// Dynamically import MultiSelectInput without SSR
+const MultiSelectInput = dynamic(() => import('./MultiSelectInput'), { ssr: false });
+
+const SearchForm = ({ setResults }: { setResults: (data: any[]) => void }) => {
+  type SelectOption = {
+    value: string;
+    label: string;
+    img?: string;
+    subTitle?: string;
+  };
+
+  // Value
+  const [projectName, setProjectName] = useState<SelectOption[]>([]);
+  const [planType, setPlanType] = useState<SelectOption[]>([]);
+  const [planinhaltType, setPlaninhaltType] = useState<SelectOption[]>([]);
+  const [phaseType, setPhaseType] = useState<SelectOption[]>([]);
+  const [massstabType, setMassstabType] = useState<SelectOption[]>([]);
+
+  // Options
+  const [projectOptions, setProjectOptions] = useState<SelectOption[]>([]);
+  const [planinhaltOptions, setPlaninhaltOptions] = useState<SelectOption[]>([]);
+  const [projectPlanOptions, setProjectPlanOptions] = useState<SelectOption[]>([]);
+  const [projectMassstabOptions, setMassstabOptions] = useState<SelectOption[]>([]);
+  const [projectPhaseOptions, setPhaseOptions] = useState<SelectOption[]>([]);
+
+  const [planContent, setPlanContent] = useState<SelectOption[]>([]);
+  const [workPhase, setWorkPhase] = useState<SelectOption[]>([]);
+  const [scale, setScale] = useState<SelectOption[]>([]);
+  
+  // State for each metadata key
+  const [metadataSelections, setMetadataSelections] = useState<Record<string, SelectOption[]>>({});
+  const [metadata, setMetadata] = useState<string[] | null>(null);
+  const [metaDataOptions, setMetaDataOptions] = useState<Record<string, SelectOption[]>>({});
 
   const router = useRouter();
 
-  // Handle form submission
+  const validateForm = () => {
+    const newErrors: any = {};
+    if (projectName.length === 0) newErrors.projectName = 'Please select a project name.';
+    if (planType.length === 0) newErrors.planType = 'Please select a plan type.';
+    if (planContent.length === 0) newErrors.planContent = 'Please select plan content.';
+    if (workPhase.length === 0) newErrors.workPhase = 'Please select a work phase.';
+    if (scale.length === 0) newErrors.scale = 'Please select a scale.';
+    if (metadataSelections["openSearch"]?.length === 0) newErrors.openSearch = 'Please select an open search option.';
+    return newErrors;
+  };
+
+  // Fetch project names when the component mounts
+  useEffect(() => {
+    async function fetchProjectNames() {
+      try {
+        const projectNames = await getProjects(); // Adjust getProjects if needed
+        const options = projectNames.map((name: string) => ({
+          value: name,
+          label: name,
+        }));
+        setProjectOptions(options);
+      } catch (error) {
+        console.error("Error fetching project names:", error);
+      }
+    }
+
+    fetchProjectNames();
+  }, []);
+
+  // Map data to match MultiSelectInput format
+  useEffect(() => {
+    setProjectPlanOptions(projectPlanData.map((item) => ({
+      value: item.label || "",
+      label: item.label || "No Label",
+    })));
+    setPlaninhaltOptions(projectPlainhaltData.map((item) => ({
+      value: item.label || "",
+      label: item.label || "No Label",
+    })));
+    setMassstabOptions(projectMassstabData.map((item) => ({
+      value: item.label || "",
+      label: item.label || "No Label",
+    })));
+    setPhaseOptions(projectPhaseData.map((item) => ({
+      value: item.label || "",
+      label: item.label || "No Label",
+    })));
+  }, []);
+
+  // Fetch metadata when a project is selected
+  const handleSelectProject = async (selectedProject: any) => {
+    if (!selectedProject || !selectedProject.value) return;
+
+    try {
+      const projectName = selectedProject.value;
+      const response = await GetMetaData(projectName);
+
+      if (response?.data) {
+        const metadataResult = response.data[1].values; // Assuming the API response is already in the desired format
+        const newMetadataOptions: Record<string, SelectOption[]> = {};
+
+        metadataResult.forEach((item: any) => {
+          if (item.values) {
+            newMetadataOptions[item.label] = item!.values.map((value: { key: string; value: string }) => ({
+              value: value.value,
+              label: value.value,
+            }));
+          }
+        });
+
+        setMetadata(Object.keys(newMetadataOptions)); // Keys represent metadata labels
+        setMetaDataOptions(newMetadataOptions); // Store options for each key
+      } else {
+        setMetadata(null);
+        setMetaDataOptions({});
+      }
+    } catch (error) {
+      console.error("Error fetching project metadata:", error);
+    }
+  };
+
+  // Handle change for each metadata key separately
+  const handleMetadataChange = (key: string, selectedOptions: SelectOption[]) => {
+    setMetadataSelections((prevSelections) => ({
+      ...prevSelections,
+      [key]: selectedOptions,
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+  
     try {
-      // Call SearchWithProject with project name
-      const data = await SearchWithProject(projectName);
-      if (data === null) {
-        console.log('Project not found');
-        // You can display a message or handle the absence of project here
-      } else {
-        console.log('Project found:', data);
-        // Proceed with displaying the project metadata
-      }
-      // Use router.push() with a proper URL
       const queryParams = new URLSearchParams();
-      const dataLength = data ? data.length : 0; // If data is not null, get length, otherwise 0
 
-      queryParams.set('data', JSON.stringify(data));
+      // Function to append all values from an array to the query parameters
+      const appendAllValues = (key: any, values: any) => {
+        values.forEach((item: any) => {
+          if (item?.value) {
+            queryParams.append(key, item.value);
+          }
+        });
+      };
 
-      // Navigate to the result page with the data as a query string
+      appendAllValues("projectName", projectName);
+      appendAllValues("planType", planType);
+      appendAllValues("planContent", planinhaltType);
+      appendAllValues("phase", phaseType);
+      appendAllValues("scale", massstabType);
+      appendAllValues("openSearch", metadataSelections["openSearch"] || []);
+
+      console.log(queryParams.toString());
+  
+      // Navigate to the results page
       router.push(`/result?${queryParams.toString()}`);
-       
     } catch (error) {
       console.error("Error fetching project data:", error);
     }
   };
 
   return (
-    <div className="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
+    <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[500px] bg-[#FAFAFA]">
       <h1 className="text-2xl font-bold mb-4 text-center">Bauplan finden</h1>
       <form className="space-y-4" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Projektname"
-          className="w-full border p-2 rounded"
+        <MultiSelectInput
           value={projectName}
-          onChange={(e) => setProjectName(e.target.value)}
+          setValue={(value) => {
+            setProjectName(value);
+            handleSelectProject(value[0]);
+          }}
+          options={projectOptions}
+          placeholder="Projektname"
+          instanceId="projectName"
         />
-        <input
-          type="text"
-          placeholder="Planart"
-          className="w-full border p-2 rounded"
+        <MultiSelectInput
           value={planType}
-          onChange={(e) => setPlanType(e.target.value)}
+          setValue={setPlanType}
+          options={projectPlanOptions}
+          placeholder="Planart"
+          instanceId="Planart"
         />
-        <input
-          type="text"
+        <MultiSelectInput
+          value={planinhaltType}
+          setValue={setPlaninhaltType}
+          options={planinhaltOptions}
           placeholder="Plainhalt"
-          className="w-full border p-2 rounded"
-          value={planContent}
-          onChange={(e) => setPlanContent(e.target.value)}
+          instanceId="Plainhalt"
         />
-        <input
-          type="text"
+        <MultiSelectInput
+          value={phaseType}
+          setValue={setPhaseType}
+          options={projectPhaseOptions}
           placeholder="Leistungsphase"
-          className="w-full border p-2 rounded"
-          value={workPhase}
-          onChange={(e) => setWorkPhase(e.target.value)}
+          instanceId="Leistungsphase"
         />
-        <input
-          type="text"
+        <MultiSelectInput
+          value={massstabType}
+          setValue={setMassstabType}
+          options={projectMassstabOptions}
           placeholder="Maßstab"
-          className="w-full border p-2 rounded"
-          value={scale}
-          onChange={(e) => setScale(e.target.value)}
+          instanceId="Maßstab"
         />
-        <input
-          type="text"
+        {metadata &&
+          metadata.map((key: string, index: number) => (
+            <MultiSelectInput
+              key={index}
+              value={metadataSelections[key] || []}
+              setValue={(value) => handleMetadataChange(key, value)}
+              options={metaDataOptions[key] || []}
+              placeholder={key}
+              instanceId={`uniqueKey-${key}`}
+            />
+          ))}
+        <MultiSelectInput
+          value={metadataSelections["openSearch"] || []}
+          setValue={(value) => handleMetadataChange("openSearch", value)}
+          options={[]}
           placeholder="Offene Suche"
-          className="w-full border p-2 rounded"
-          value={openSearch}
-          onChange={(e) => setOpenSearch(e.target.value)}
+          instanceId="Offene Suche"
         />
         <button
           type="submit"
